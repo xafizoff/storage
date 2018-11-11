@@ -1,5 +1,5 @@
 {-# LANGUAGE ForeignFunctionInterface, PatternGuards #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, CPP #-}
 {-# OPTIONS_GHC -fno-warn-tabs #-}
 
 module S where
@@ -29,6 +29,9 @@ import qualified Data.Map as Map
 
 import qualified Data.Maybe as Maybe
 
+#if MIN_VERSION_base(4,9,0)
+import Data.Semigroup as Sem
+#endif
 import Data.Monoid
 
 import qualified Data.Set as Set
@@ -238,9 +241,20 @@ instance Show Builder where
 builderNull :: Builder -> Bool
 builderNull = (<1) . builderLength
 
+builderAppend (Builder l1 b1) (Builder l2 b2) = Builder (l1+l2) (b1 <> b2)
+
+#if MIN_VERSION_base(4,9,0)
+instance Sem.Semigroup Builder where
+  (<>) = builderAppend
+#endif
 instance Monoid Builder where
-	mappend (Builder l1 b1) (Builder l2 b2) = Builder (l1+l2) (mappend b1 b2)
 	mempty = Builder 0 mempty
+#if MIN_VERSION_base(4,11,0)
+#elif MIN_VERSION_base(4,9,0)
+  mappend = (Sem.<>)
+#else
+  mappend = builderAppend
+#endif
 
 toLazyByteString :: Builder -> BS.ByteString
 toLazyByteString (Builder _ b) = BSB.toLazyByteString b
@@ -1266,7 +1280,7 @@ newLSMWithConfig pageBits statesCount forceCreate path
 	forkIO $ lsmWorker lsm
 	return $ lsmCmdChan lsm
 
--- |Create/openexisting LSM file with default parameters.
+-- |Create/open existing LSM file with default parameters.
 newLSM :: Bool -> FilePath -> IO LSMCmdChan
 newLSM forceCreate fn = newLSMWithConfig defaultPageBits 3 forceCreate fn
 
