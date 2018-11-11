@@ -1,7 +1,7 @@
 {-# LANGUAGE ForeignFunctionInterface, PatternGuards #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving, CPP #-}
 {-# OPTIONS_GHC -fno-warn-tabs #-}
-
+{- Copyright (C) 2017 Serguey Zefirov -}
 module S where
 
 import Control.Exception (bracket)
