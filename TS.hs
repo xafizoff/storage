@@ -2,6 +2,7 @@
 
 module Main where
 
+import Control.Exception
 import Control.Monad
 
 import qualified Data.ByteString.Lazy as BS
@@ -78,20 +79,26 @@ testWriteUpTo16KCommitCloseOpenReadRollback = do
 		test n = do
 			runtime ("wrote "++show n) $ do
 				putStrLn $ "testing portion of size "++show n
-				lsm <- newLSM True file
-				putStrLn $ "Created."
-				--getLine
-				tx <- lsmBegin ReadCommitted lsm
-				forM_ [1..n] $ \i -> do
-					let	k = mkBS $ show i
-						v = mkBS $ show (i+n)
-					lsmWrite tx k v
-				lsmCommit tx
-				lsmClose lsm
+				bracket
+				  (newLSM True file)
+				  (\lsm -> lsmClose lsm)
+				  (\lsm -> do
+				  putStrLn "Created."
+				  tx <- lsmBegin ReadCommitted lsm
+				  forM_ [1..n] $ \i -> do
+				    let	k = mkBS $ show i
+				        v = mkBS $ show (i+n)
+				    lsmWrite tx k v
+				  lsmCommit tx
+				  putStrLn $ "Wrote "++show n
+				  )
 				putStrLn $ "Wrote "++show n
 			runtime ("read back "++show n) $ do
 				--getLine
-				lsm <- newLSM False file
+				bracket
+				  (newLSM False file)
+				  (\lsm -> lsmClose lsm)
+				  (\lsm -> do
 				putStrLn "Reopened."
 				tx <- lsmBegin ReadCommitted lsm
 				forM_ [1..n] $ \i -> do
@@ -100,7 +107,7 @@ testWriteUpTo16KCommitCloseOpenReadRollback = do
 					v' <- lsmRead tx k
 					when (v' /= Just v) $ error $ "expected " ++ show (Just v) ++", got "++show v'++" for key "++show k
 				lsmRollback tx
-				lsmClose lsm
+				)
 
 
 main = do
